@@ -3,13 +3,6 @@ from .models import Job, Chat, Company, Message, CheckCode, Notification, CV
 from rest_framework import serializers
 
 
-
-class CVSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CV
-        fields = "__all__"
-        read_only_fields = ("id", 'user', 'created_at', 'updated_at')
-
 class CheckCodeSerializer(serializers.Serializer):
     class Meta:
 
@@ -23,22 +16,6 @@ class UserSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("id",)
 
-class JobSerializer(serializers.ModelSerializer):
-    company_name = serializers.SerializerMethodField(source='company.name', read_only=True)
-    class Meta:
-        model = Job
-        fields = "__all__"
-        read_only_fields = ("id",)
-        extra_kwargs = {
-            'owner': {'read_only': True},
-            'company': {'read_only': True}, # owner clientdan kelmaydi, server qo'yadi
-        }
-
-class ChatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Chat
-        fields = "__all__"
-        read_only_fields = ("id",)
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -53,11 +30,34 @@ class CompanySerializer(serializers.ModelSerializer):
         validated_data['owner'] = self.context['request'].user
         return super().create(validated_data)
 
+class ChatSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    company = CompanySerializer(read_only=True)
+
+    class Meta:
+        model = Chat
+        fields = "__all__"
+        read_only_fields = ("id",)
+
+
+class JobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = "__all__"
+        read_only_fields = ("id",)
+        extra_kwargs = {
+            'owner': {'read_only': True},
+            'company': {'read_only': True}, # owner clientdan kelmaydi, server qo'yadi
+        }
+
+
 class MessageSerializer(serializers.ModelSerializer):
+    chat = ChatSerializer(read_only=True)
+    owner = UserSerializer(read_only=True)
     class Meta:
         model = Message
         fields = "__all__"
-        read_only_fields = ("id", 'owner', 'timestamp')
+        read_only_fields = ("id", 'owner', 'chat', 'timestamp')
 
 class NotificationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -66,6 +66,12 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", 'user', 'created_at')
 
 
-
+class CVSerializer(serializers.ModelSerializer):
+    job = JobSerializer()
+    user = UserSerializer()
+    class Meta:
+        model = CV
+        fields = "__all__"
+        read_only_fields = ("id", 'user', 'created_at', 'updated_at')
 
 

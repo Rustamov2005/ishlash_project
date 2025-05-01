@@ -20,36 +20,10 @@ JOB_TYPE_CHOICES = [
 # Create your models here.
 
 
-class CV(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
-    full_name = models.CharField(max_length=255)
-    birth_date = models.DateField()
-    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')])
-    profession = models.CharField(max_length=255)
-    bio = models.TextField(blank=True)
-
-    phone = models.CharField(max_length=20)
-    email = models.EmailField()
-    address = models.TextField(blank=True)
-
-    skills = models.TextField(help_text="Comma-separated skills: Python, Django, Docker")
-    languages = models.TextField(help_text="Comma-separated languages: English, Uzbek")
-
-    linkedin = models.URLField(blank=True)
-    github = models.URLField(blank=True)
-    website = models.URLField(blank=True)
-
-    cv_file = models.FileField(upload_to='cv_files/', blank=True, null=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.full_name}'s CV"
-
-class Profile(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-
+# class Profile(models.Model):
+#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+#
 
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -81,8 +55,7 @@ class User(AbstractUser):
     last_name = models.CharField("First Name", max_length=127, blank=True, null=True)
     email = models.EmailField("email address", unique=True, db_index=True)
     profile_picture = models.ImageField("Profile Picture", upload_to="profile_picture", null=True, blank=True)
-
-    is_employer = models.BooleanField(default=True)
+    is_employer = models.BooleanField(default=False)
 
     # Override groups and user_permissions with custom related_names
     groups = models.ManyToManyField("auth.Group", verbose_name="groups", blank=True, help_text="The groups this user belongs to.", related_name="core_user_set", related_query_name="core_user")
@@ -144,7 +117,7 @@ class Chat(models.Model):
 class Message(models.Model):
     content = models.TextField()
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE)
-    cv_file = models.FileField(upload_to='files/')
+    cv_file = models.FileField(upload_to='files/', null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
@@ -156,7 +129,38 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    job = models.ForeignKey(Job, on_delete=models.CASCADE)
 
     def __str__(self):
         return f"To {self.user.username}: {self.message[:30]}"
+
+
+
+
+class CV(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    job = models.ForeignKey(Job, on_delete=models.CASCADE)
+    full_name = models.CharField(max_length=255)
+    birth_date = models.DateField()
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')])
+    profession = models.CharField(max_length=255)
+    bio = models.TextField(blank=True)
+
+    phone = models.CharField(max_length=20)
+    email = models.EmailField()
+    address = models.TextField(blank=True)
+
+    skills = models.TextField(help_text="Comma-separated skills: Python, Django, Docker")
+    languages = models.TextField(help_text="Comma-separated languages: English, Uzbek")
+
+    linkedin = models.URLField(blank=True)
+    github = models.URLField(blank=True)
+    website = models.URLField(blank=True)
+
+    cv_file = models.FileField(upload_to='cv_files/', blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.full_name}'s CV"
 

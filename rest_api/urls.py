@@ -1,8 +1,8 @@
 from django.contrib import admin
 from django.urls import path, include
-from .views import (BookAPIView, UserRegistration1View, UserRegistration2View, UserRegistration3View, LogoutView, ForgotPasswordView,
+from .views import (UserRegistration1View, UserRegistration2View, UserRegistration3View, LogoutView, ForgotPasswordView,
                     ResetPasswordView, ProfileView, ChangePasswordAuthview, CVdownloadView, CVdeleteView, CompanyView, CompanyInfoView,
-                    JobsView, JobDetailView, ChatsView, MessagesView, NotificationView, CVView, CVDeleteAPIView, CVUpdateView)
+                    JobsView, JobDetailView, ChatsView, MessagesView, NotificationView,NotificationUpdateView, CVView, CVDeleteAPIView, CVUpdateView)
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
@@ -23,7 +23,6 @@ schema_view = get_schema_view(
 
 
 urlpatterns = [
-    path('book/', BookAPIView.as_view()),
     path('auth/verify-email/', UserRegistration1View.as_view()),
     path('auth/verify-email/confirm/', UserRegistration2View.as_view()),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
@@ -40,8 +39,8 @@ urlpatterns = [
     path('jobs/<int:job_id>/', JobDetailView.as_view()),
     path('chats/', ChatsView.as_view()),
     path('chats/<int:chat_id>/messages/', MessagesView.as_view()),
-    path('notification/', NotificationView.as_view()),
-    path('notification/<int:notification_id>/', NotificationView.as_view()),
+    path('notification/<int:job_id>/', NotificationView.as_view()),
+    path('notification/update/<int:notification_id>/', NotificationUpdateView.as_view()),
     path('cv/', CVView.as_view()),
     path('cv/upload/', CVUpdateView.as_view()),
     path('cv/<int:pk>/delete/', CVDeleteAPIView.as_view()),

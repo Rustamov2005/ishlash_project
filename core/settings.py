@@ -163,7 +163,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'rotabek752@gmail.com'
-EMAIL_HOST_PASSWORD = '1234'
+EMAIL_HOST_PASSWORD = 'zofveywlyyppgmiu'
 
 
 #AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")  # noqa: F405

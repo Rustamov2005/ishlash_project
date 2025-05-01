@@ -20,6 +20,7 @@ from rest_framework import status, permissions
 from random import randint
 import random
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 User = get_user_model()
@@ -275,14 +276,17 @@ class ProfileView(APIView):
             serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
     def delete(self, request):
         user = request.user
         user.is_active = False
         user.save()
         return Response(data="Foydalanuvchi o'chirildi", status=status.HTTP_200_OK)
 
+
 class CVdownloadView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
+
 
     def post(self, request):
         user = request.user
@@ -310,12 +314,20 @@ class CompanyView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
+        user = request.user
+        if user.is_employer != True:
+            return Response(data="Sizga ruhsat etilmagan", status=status.HTTP_400_BAD_REQUEST)
         companies = Company.objects.all()
+        if request.user.is_employer == True:
+            companies = Company.objects.filter(owner=user)
         serializer = CompanySerializer(companies, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
 
+    def post(self, request):
+        user = request.user
+        if user.is_employer != True:
+            return Response(data="Sizga ruhsat etilmagan", status=status.HTTP_400_BAD_REQUEST)
         serializer = CompanySerializer(data=request.data, context={'request': request})
 
         if serializer.is_valid():
@@ -333,19 +345,31 @@ class CompanyInfoView(APIView):
             company = Company.objects.get(id=company_id)
         except Company.DoesNotExist:
             return Response({"error": "Kompaniya topilmadi."}, status=status.HTTP_404_NOT_FOUND)
-
         serializer = CompanySerializer(company)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
     def delete(self, request, company_id):
+        user = request.user
+
+        if not user.is_employer:
+            return Response({"detail": "Sizga ruhsat etilmagan"}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             company = Company.objects.get(id=company_id)
-            company.delete()
-            return Response({"detail": "Kompaniya o'chirildi."}, status=status.HTTP_200_OK)
         except Company.DoesNotExist:
             return Response({"detail": "Kompaniya topilmadi"}, status=status.HTTP_404_NOT_FOUND)
 
+        if company.owner != user:
+            return Response({"detail": "Siz ushbu kompaniyani o'chira olmaysiz."}, status=status.HTTP_403_FORBIDDEN)
+
+        company.delete()
+        return Response({"detail": "Kompaniya o'chirildi."}, status=status.HTTP_200_OK)
+
+
     def put(self, request, company_id):
+        user = request.user
+        if user.is_employer != True:
+            return Response(data="Sizga ruhsat etilmagan", status=status.HTTP_400_BAD_REQUEST)
         try:
             company = Company.objects.get(pk=company_id)
         except Company.DoesNotExist:
@@ -409,8 +433,25 @@ class JobsView(APIView):
         serializer = JobSerializer(jobs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
 
+
+class ManagerEDITJOBSView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = JobSerializer
+
+    def get(self, request):
+        user = request.user
+        if user.is_employer != True:
+            return Response(data="Sizga ruhsat etilmagan", status=status.HTTP_400_BAD_REQUEST)
+        jobs = Job.objects.filter(owner=user)
+        serializer = JobSerializer(jobs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+    def post(self, request):
+        user = request.user
+        if user.is_employer != True:
+            return Response(data="Sizga ruhsat etilmagan", status=status.HTTP_400_BAD_REQUEST)
         serializer = JobSerializer(data=request.data, context={'request': request})
         user = request.user
         company = Company.objects.filter(owner=user).first()
@@ -465,108 +506,245 @@ class ChatsView(APIView):
     def get(self, request):
        user = request.user
        chats = Chat.objects.filter(user=user)
+       if user.is_employer == True:
+           company = Company.objects.filter(owner=user).first()
+           chats = Chat.objects.filter(company=company)
+           serializer = ChatSerializer(chats, many=True)
+           return Response(serializer.data, status=status.HTTP_200_OK)
+
        serializer = ChatSerializer(chats, many=True)
        return Response(serializer.data, status=status.HTTP_200_OK)
 
-
     def post(self, request):
         user = request.user
+        company_id = request.data.get('company_id')
+
+        if user.is_employer:
+            return Response(data="Sizga ruxsat etilmagan", status=status.HTTP_403_FORBIDDEN)
+
         try:
-            company = Company.objects.get(owner=user)
+            company = Company.objects.get(id=company_id)
         except Company.DoesNotExist:
-            return Response({'error': 'Userga tegishli kompaniya topilmadi'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Kompaniya topilmadi'}, status=status.HTTP_404_NOT_FOUND)
 
-        data = {
-            'user': user.id,
-            'company': company.id
-        }
+        # Chat allaqachon mavjudligini tekshirish
+        if Chat.objects.filter(user=user, company=company).exists():
+            return Response({'detail': 'Chat allaqachon mavjud'}, status=status.HTTP_200_OK)
 
-        serializer = ChatSerializer(data=data)
+        # Serializer uchun to'g'ridan-to'g'ri model instance beriladi
+        serializer = ChatSerializer(data={'user': user.id, 'company': company.id})
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=user, company=company)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MessagesView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request, chat_id):
-       chat = get_object_or_404(Chat, id=chat_id, user=request.user)
-       messages = Message.objects.filter(chat=chat).order_by('timestamp')
-       serializer = MessageSerializer(messages, many=True)
-       return Response(serializer.data, status=status.HTTP_200_OK)
+        if request.user.is_employer == True:
+            chat = Chat.objects.get(id=chat_id)
+            company = Company.objects.filter(owner=request.user).first()
+            if chat.company != company:
+                return Response({"error": "You do not have permission to edit this chat."}, status=status.HTTP_403_FORBIDDEN)
+            messages = Message.objects.filter(chat=chat).order_by('timestamp')
+            serializer = MessageSerializer(messages, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+        messages = Message.objects.filter(chat=chat).order_by('timestamp')
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, chat_id):
-        chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+        chat = get_object_or_404(Chat, id=chat_id)
 
+        # Ish beruvchi bo‘lsa, kompaniya egasi ekanligini tekshirish
+        if request.user.is_employer:
+            company = Company.objects.filter(owner=request.user).first()
+            if chat.company != company:
+                return Response({"error": "You do not have permission to edit this chat."},
+                                status=status.HTTP_403_FORBIDDEN)
+
+        # Foydalanuvchi chatga ega ekanligini tekshirish
+        elif chat.user != request.user:
+            return Response({"error": "You do not have permission to edit this chat."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        # Ma'lumotlar tayyorlash
         data = request.data.copy()
-        data['chat'] = chat.id
-
-
+        data['owner'] = request.user.id  # Faraz qilamiz: Message modelida `owner` maydoni mavjud
         serializer = MessageSerializer(data=data)
         if serializer.is_valid():
-            serializer.save(owner=request.user)
+            serializer.save(chat=chat, owner=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class NotificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request):
+    def get(self, request, job_id):
         user = request.user
-        notifications = Notification.objects.filter(user=user).order_by('-created_at')
+        try:
+            job = Job.objects.get(id=job_id)
+        except Job.DoesNotExist:
+            return Response(data="Bunday ish topilmadi.", status=status.HTTP_404_NOT_FOUND)
+
+        if job.owner != user:
+            return Response(data="Siz bu ish uchun xabarlarni ko'raolmisiz.", status=status.HTTP_403_FORBIDDEN)
+        notifications = Notification.objects.filter(user=user)
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        serializer = NotificationSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, job_id):
+        user = request.user
+
+        if user.is_employer:
+            return Response(
+                {"detail": "sizda kommit qoldirish uchun ruxsat yuq."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        data = request.data
+        required_fields = ['message']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+
+        if missing_fields:
+            return Response(
+                {"detail": f"Quyidagi maydonlar yetishmayapti: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            job = Job.objects.get(id=job_id)
+        except Job.DoesNotExist:
+            return Response(data="Bunday ish mavjud emas.", status=status.HTTP_404_NOT_FOUND)
+
+        notification = Notification.objects.create(
+            user=user,
+            job=job,
+            message=data['message']
+        )
+
+        return Response(data="Notifikation muvofaqqiyatli yaratildi", status=status.HTTP_201_CREATED)
+
+
+class NotificationUpdateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def put(self, request, notification_id):
-        notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+        try:
+            notification = Notification.objects.get(id=notification_id)
+        except Notification.DoesNotExist:
+            return Response(data="Notification topilmadi.", status=status.HTTP_404_NOT_FOUND)
+
+        if notification.user != request.user:
+            return Response(data="Siz bu xabarnomani tahrir qila olmaysiz.", status=status.HTTP_403_FORBIDDEN)
+
         serializer = NotificationSerializer(notification, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, notification_id):
+        user = request.user
         notification = get_object_or_404(Notification, id=notification_id)
+        is_job_owner = notification.job.owner == user
+        is_creator = notification.user == request.user
+        if not (is_job_owner or is_creator):
+            return Response(data="Siz bu kommitni o'chirib yuborolmisiz.", status=status.HTTP_403_FORBIDDEN)
         notification.delete()
-        return Response(data="Notification o'chirib yuborildi",  status=status.HTTP_204_NO_CONTENT)
+        return Response(data="Notifikation o'chirib yuborildi", status=status.HTTP_204_NO_CONTENT)
+
 
 class CVView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
+        user = request.user
+        if user.is_employer:
+            cvs = CV.objects.filter(job__owner=user)
+            serializer = CVSerializer(cvs, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         cvs = CV.objects.filter(user=request.user)
         serializer = CVSerializer(cvs, many=True)
         return Response(serializer.data)
 
+
+
 class CVUpdateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
+    parser_classes = [MultiPartParser, FormParser]  # Fayl va form ma'lumotlarini qabul qilish uchun
 
     def post(self, request):
-        serializer = CVSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+
+        # 1. Faqat "employee" foydalanuvchilar kirita oladi
+        if user.is_employer:
+            return Response(
+                {"detail": "You do not have permission to edit this job."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 2. Kerakli ma'lumotlarni olish
+        data = request.data
+        required_fields = ['job_id', 'full_name', 'birth_date', 'gender', 'profession', 'bio',
+                           'phone', 'email', 'address', 'skills', 'languages',
+                           'linkedin', 'github', 'website']
+        missing_fields = [field for field in required_fields if not data.get(field)]
+        if missing_fields or 'cv' not in request.FILES:
+            return Response(
+                {"detail": f"Quyidagi maydonlar yetishmayapti: {', '.join(missing_fields + (['cv'] if 'cv' not in request.FILES else []))}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 3. Job obyekt mavjudligini tekshirish
+        job_id = data.get('job_id')
+        try:
+            job = Job.objects.get(id=job_id)
+        except Job.DoesNotExist:
+            return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 4. CV ni yaratish
+        CV.objects.create(
+            user=user,
+            job=job,
+            full_name=data['full_name'],
+            birth_date=data['birth_date'],
+            gender=data['gender'],
+            profession=data['profession'],
+            bio=data['bio'],
+            phone=data['phone'],
+            email=data['email'],
+            address=data['address'],
+            skills=data['skills'],
+            languages=data['languages'],
+            linkedin=data['linkedin'],
+            github=data['github'],
+            website=data['website'],
+            cv_file=request.FILES['cv']
+        )
+
+        return Response({"detail": "Resumeyingiz yaratildi batafsil"}, status=status.HTTP_200_OK)
 
 
-class CVDeleteAPIView(generics.DestroyAPIView):
-    queryset = CV.objects.all()
-    serializer_class = CVSerializer
-    permission_classes = [permissions.IsAuthenticated]
+class CVDeleteAPIView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
 
-    def get_queryset(self):
-        return self.queryset.filter(user=self.request.user)
+    def delete(self, request, pk):
+        user = request.user
+        if user.is_employer != True:
+            return Response({"detail": "You do not have permission to delete this CV."}, status=status.HTTP_403_FORBIDDEN)
+
+        cv = get_object_or_404(CV, id=pk)
+        cv.delete()
+        return Response({"detail": "CV deleted successfully."}, status=status.HTTP_200_OK)
 
 
-class BookAPIView(APIView):
-    permission_classes = (permissions.IsAuthenticated, )
-    def get(self, request):
-        return Response(data="salom otabek", status=status.HTTP_200_OK)
+
+
+
