@@ -23,7 +23,7 @@ class CompanySerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("id",)
         extra_kwargs = {
-            'owner': {'read_only': True}  # owner clientdan kelmaydi, server qo'yadi
+            'owner': {'read_only': True}
         }
 
     def create(self, validated_data):
@@ -47,7 +47,7 @@ class JobSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
         extra_kwargs = {
             'owner': {'read_only': True},
-            'company': {'read_only': True}, # owner clientdan kelmaydi, server qo'yadi
+            'company': {'read_only': True},
         }
 
 

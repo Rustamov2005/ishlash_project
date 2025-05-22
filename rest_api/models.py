@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 
 FULL_TIME = 'FULL_TIME'
@@ -19,11 +18,6 @@ JOB_TYPE_CHOICES = [
 
 # Create your models here.
 
-
-
-# class Profile(models.Model):
-#     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-#
 
 class Profile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -57,14 +51,13 @@ class User(AbstractUser):
     profile_picture = models.ImageField("Profile Picture", upload_to="profile_picture", null=True, blank=True)
     is_employer = models.BooleanField(default=False)
 
-    # Override groups and user_permissions with custom related_names
     groups = models.ManyToManyField("auth.Group", verbose_name="groups", blank=True, help_text="The groups this user belongs to.", related_name="core_user_set", related_query_name="core_user")
     user_permissions = models.ManyToManyField("auth.Permission", verbose_name="user permissions", blank=True, help_text="Specific permissions for this user.", related_name="core_user_set", related_query_name="core_user")
 
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ['username']  # Add 'username' to REQUIRED_FIELDS
+    REQUIRED_FIELDS = ['username']
 
     def __str__(self):
         return f"{self.email} - {self.is_employer}"

@@ -1,0 +1,28 @@
+
+
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/rest_api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DEBUG=True
+      - DB_NAME=company
+      - DB_USER=postgres
+      - DB_PASSWORD=2005
+      - DB_HOST=db
+      - DB_PORT=5432
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: company
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 2005
+    ports:
+      - "5432:5432"
+

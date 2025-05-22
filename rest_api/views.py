@@ -32,7 +32,7 @@ class LogoutView(APIView):
             refresh_token = request.data["access"]
             token = RefreshToken(refresh_token)
             token.blacklist()
-            return Response({"detail": "Logout successful"}, status=status.HTTP_205_RESET_CONTENT)
+            return Response({"detail": "Muvofaqqiyqtli chiqish"}, status=status.HTTP_205_RESET_CONTENT)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -43,11 +43,11 @@ class UserRegistration1View(APIView):
     def post(self, request):
         email = request.data.get('email')
         if not email:
-            return Response({'error': 'Email required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Email kiriting'}, status=status.HTTP_400_BAD_REQUEST)
 
         users = User.objects.filter(username=email)
         if users.exists():
-            return Response({'error': 'username already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'username allaqachon yaratilgan'}, status=status.HTTP_400_BAD_REQUEST)
 
         code = str(randint(1000, 9999))
         subject = "Email Verification Code"
@@ -131,11 +131,11 @@ class UserRegistration3View(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
         if not email or not full_name or not username:
-            return Response({'error': 'something went wrong'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': "Nimadur xatolik ro'y berdi"}, status=status.HTTP_400_BAD_REQUEST)
         if not password:
-            return Response({'error': 'password is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'password kiriting'}, status=status.HTTP_400_BAD_REQUEST)
         if len(password) < 6:
-            return Response({'error': 'password is too short'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'password qisqa'}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.create_user(username=username, email=email, first_name=full_name, last_name=full_name)
         user.password = make_password(password)
@@ -489,7 +489,6 @@ class JobDetailView(APIView):
         except Job.DoesNotExist:
             return Response({"detail": "Job not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Faqat egasi tahrir qila oladi
         if job.owner != request.user:
             return Response({"detail": "You do not have permission to edit this job."},
                             status=status.HTTP_403_FORBIDDEN)
@@ -527,11 +526,10 @@ class ChatsView(APIView):
         except Company.DoesNotExist:
             return Response({'error': 'Kompaniya topilmadi'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Chat allaqachon mavjudligini tekshirish
+
         if Chat.objects.filter(user=user, company=company).exists():
             return Response({'detail': 'Chat allaqachon mavjud'}, status=status.HTTP_200_OK)
 
-        # Serializer uchun to'g'ridan-to'g'ri model instance beriladi
         serializer = ChatSerializer(data={'user': user.id, 'company': company.id})
         if serializer.is_valid():
             serializer.save(user=user, company=company)
@@ -560,21 +558,18 @@ class MessagesView(APIView):
     def post(self, request, chat_id):
         chat = get_object_or_404(Chat, id=chat_id)
 
-        # Ish beruvchi bo‘lsa, kompaniya egasi ekanligini tekshirish
         if request.user.is_employer:
             company = Company.objects.filter(owner=request.user).first()
             if chat.company != company:
                 return Response({"error": "You do not have permission to edit this chat."},
                                 status=status.HTTP_403_FORBIDDEN)
 
-        # Foydalanuvchi chatga ega ekanligini tekshirish
         elif chat.user != request.user:
             return Response({"error": "You do not have permission to edit this chat."},
                             status=status.HTTP_403_FORBIDDEN)
 
-        # Ma'lumotlar tayyorlash
         data = request.data.copy()
-        data['owner'] = request.user.id  # Faraz qilamiz: Message modelida `owner` maydoni mavjud
+        data['owner'] = request.user.id
         serializer = MessageSerializer(data=data)
         if serializer.is_valid():
             serializer.save(chat=chat, owner=request.user)
@@ -678,19 +673,17 @@ class CVView(APIView):
 
 class CVUpdateView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
-    parser_classes = [MultiPartParser, FormParser]  # Fayl va form ma'lumotlarini qabul qilish uchun
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         user = request.user
 
-        # 1. Faqat "employee" foydalanuvchilar kirita oladi
         if user.is_employer:
             return Response(
                 {"detail": "You do not have permission to edit this job."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # 2. Kerakli ma'lumotlarni olish
         data = request.data
         required_fields = ['job_id', 'full_name', 'birth_date', 'gender', 'profession', 'bio',
                            'phone', 'email', 'address', 'skills', 'languages',
@@ -702,7 +695,6 @@ class CVUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 3. Job obyekt mavjudligini tekshirish
         job_id = data.get('job_id')
         try:
             job = Job.objects.get(id=job_id)
